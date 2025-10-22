@@ -14,4 +14,5 @@ fn main() {
         .read_line(&mut name)
         .expect("Didn't Receive Input");
     println!("Hello, {}! {}", name.trim_end(), greeting);
+    let not_used = false;
 }
