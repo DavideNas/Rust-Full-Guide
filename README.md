@@ -509,5 +509,217 @@ println!("Age : {}", v1);
 
 ---
 
-Prosegui dal minuto 41.03 dek video YT
+## Strings
+
+Le stringhe in Rust sono istanziate come oggetti. Hanno caratteristiche simili agli array, ma come array di caratteri.
+
+Prendiamo come esempio il codice sotto:
+
+```rs
+fn main() {
+  let mut st1 = String::new();            // creo una nuova stringa
+  st1.push('A');                          // aggiungo un carattere 'A' con .push
+  st1.push_str(" word");                  // aggiungo alla fine una parola ' word' con .push_str
+
+  // start loop
+  for word in st1.split_whitespace() {    // splitto la stringa in base ai whitespace " "
+    println!("{}", word);                 // stampo ciascun elemento splittato
+  }
+  let st2 = st1.replace("A", "Another");  // creo una nuova stringa sostituendo alla prima "A" con "Another"
+  println!("{}", st2);                    // stampo la nuova stringa "Another word"
+}
+```
+
+Nell'esempio si può notare come l'oggetto string
+
+- si comporti come un array (.push)
+- con proprietà e metodi ah hoc per la manipolazione del contenuto (.replace, .split_whitespace)
+
+La variabile 'word' è una variabile di tipo **&str** che consente di puntare alla stringa e visualizzarne il contenuto.
+
+Quindi :
+
+- **String** è il tipo "stringa"
+- **&str** è il tipo "pointer to string"
+
+Altro esempio con le stringhe:
+
+```rs
+fn main() {
+  let st3 = String::from("x r t b h k k a m c");    // stringa di caratteri separati da whitespace " "
+  let mut v2 Vec<char> = st3.chars().collect();     // vettore di 'char' che estrae i caratteri automaticamente col metodo .char().collect()
+
+  // riordinamento
+  v1.sort();                // sistema i carateri interni a v1 in ordine alfabetico
+
+  // rimuove duplicati
+  v1.dedup();               // elimina i duplicati (in questo caso un carattere 'k')
+
+  // start loop
+  for char in v1 {          // cicla ogni carattere presente in 'v1'
+    println!("{}", char);   // stampa ogni elemento preso da 'v1'
+  }
+
+  let st4: &str = "A welcome message";          // creo una variabile di tipo "pointer to string"
+  let mut st5: String = st4.to_string();        // creo una mutabile come stringa che prende il valore "A welcome message" (ovvero la stringa puntata da st4)
+  println!("{}", st5);                          // stampa la stringa convertita da &str "A welcome message"
+
+  // bytes
+  let byte_arr1 = st5.as_bytes();               // 'byte_arr1' è di tipo '&[u8]' ovvero uno slice di bytes
+
+  // slice
+  let st6 = &st5[0..6];                         // una slice 'st6' dei primi 6 elementi caratteri in 'st5'
+
+  println!("String length : {}", st6.len());    // stampo la lunghezza della slice "A welc" → "String length : 6"
+
+  st5.clear();                                  // cancello st5
+  let st6 = String::from("How are");            // creo st6 → "How are"
+  let st7 = String::from(" you?");              // creo st7 → " you?"
+  let st8 = st6 + &st7;                         // concat di 2 stringhe 'st6' e 'st7'
+
+  // start loop
+  for char in st8.bytes() {                     // prende ciascun carattere nella stringa st8 leggendolo come byte
+    println!("{}", char);                       // stampa il carattere in codice decimale (da 0 a 255) → convertito come binario puro
+    // output completo [72, 111, 119, 32, 97, 114, 101, 32, 121, 111, 117, 63]
+  }
+}
+```
+
+Si può notare che:
+
+- in **st5** il valore aggiunto deriva da una variabile **&str** deve essere quindi convertito in **String** col metodo **.to_string()**
+- **byte_arr1** prende il contenuto di st5 e lo converte in bytes _[65, 32, 119, 101, 108, 99, 111, 109, 101, 32, 109, 101, 115, 115, 97, 103, 101]_
+  - questo avviene grazie al metodo **.as_bytes()**
+  - il tipo **&[u8]** è implicito (corrispondente al tipo byte), immutabile (non modificabile tramite st6), condiviso
+- anche in **st6** viene creato un riferimento "pointer to string" implicito, immutabile, condiviso
+- **st8** è il risultato del concat tra le stringhe **st6** ed **st7**, in Rust questa operazione:
+  - fa il move della prima stringa ovvero trasferisce il contenuto di **st6** in **st8**.
+  - prende SOLO il riferimento della seconda stringa **&st7** dove legge il contenuto per agganciarlo al primo.
+- nel loop chiama il metodo**.bytes()** che converte ciascun carattere come byte
+  - se sono caratteri complessi come µ, ♂, «, ♦, 😄, il valore potrebbe richiedere 2 o anche 4 bytes rappresentati come array di numeri
+    - µ → [194, 181] = 2 bytes
+    - ♂ → [226, 178, 178] = 3 bytes
+    - « → [194, 171] = 2 bytes
+    - ♦ → [226, 153, 166] = 3 bytes
+    - 😄 → [240, 159, 152, 132] = 4 bytes
+  - tutti i caratteri (moji comprese) non superano mai i 4 bytes
+
+In generale Rust interpreta i caratteri leggendo e raggruppando i byte successivi in base al valore del primo.
+
+Qua una tabella di riferimento per i caratteri UTF-8 multibyte:
+
+| Tipo byte         | Decimal range |
+| ----------------- | ------------- |
+| ASCII (1 byte)    | 0..127        |
+| Continuation byte | 128..191      |
+| Primo byte 2-byte | 192..223      |
+| Primo byte 3-byte | 224..239      |
+| Primo byte 4-byte | 240..247      |
+
+---
+
+## Casting
+
+Il casting è quella cosa che permette una conversione di tipo tra diverse tipologie di variabili.
+
+Prendiamo come esempio questo codice:
+
+```rs
+let int_u8: u8 = 5;           // u8 (byte) = 5
+let int2_u8: u8 = 4;          // u8 (byte) = 4
+let int3_u32: u32 = (int_8 as u32) + (int2_8 as u32);       // u32 con casting a u32 di 'int_u8' ed 'int2_u8'
+```
+
+Qua il nuovo numero necessita di una conversione degli operatori per validarli
+
+---
+
+## Enum
+
+Gli enum sono utili per definire gruppi di variabili con valori specifici
+
+Esempio di enum coi giorni della settimana
+
+```rs
+fn main() {
+  enum Day {      // creo l'enum
+    Monday,
+    Tuesday,
+    Wednesday,
+    Thursday,
+    Friday,
+    Saturday,
+    Sunday
+  }
+
+
+  impl Day {
+    fn is_weekend(&self) -> bool{         // '&self' è l'argomento implicito 'today'
+      // switch/case su 'self'
+      match self {
+        Day::Saturday | Day::Sunday => true,    // se 'self' è 'Saturday' o 'Sunday'
+        _ => false                              // gli altri giorni
+      }
+    }
+  }
+
+  let today:Day = Day::Monday;
+
+  // switch/case su 'today'
+  match today {
+    Day::Monday => println!("Everyone hates monday"),
+    Day::Tuesday => println!("Donut day"),
+    Day::Wednesday => println!("Hump day"),
+    Day::Thursday => println!("Pay day"),
+    Day::Friday => println!("Almost Weekend"),
+    Day::Saturday => println!("Weekend"),
+    Day::Sunday => println!("Weekend"),
+  }
+
+  println!("Is today the weekend {}", today.is_weekend());    // chiamo il metodo .is_weekend
+}
+```
+
+Dall'esempio si posono notare alcune cose come:
+
+- il metodo **.is_weekend** è legato all'oggetto 'today' di tipo **Day**
+- la funzione `fn is_weekend(&self) -> bool` ottiene come parametro l'oggetto associato al metodo (today = self)
+- **impl Day** serve ad ottenere le proprietà di metodo sulle istanze di **Day**
+  - da qui posso fare **today.is_weekend()**
+  - Quindi Rust capisce che **is_weekend** è un comportamento legato al tipo **Day**
+  - il nome **_'self'_** è una variabile Rust che ha validità SOLO all'interno dei metodi **impl**
+
+In alternativa a **impl Day** avrei potuto scrivere così:
+
+```rs
+// today è un valore passato ed associato ad una variabile interna 'day'
+fn is_weekend(day: &Day) -> bool {
+  // switch/case su 'day'
+  match day {
+        Day::Saturday | Day::Sunday => true,
+        _ => false,
+    }
+}
+
+// passo today come valore alla funzione is_weekend
+println!("Is today the weekend {}", is_weekend(&today));
+```
+
+Mettendo a confronto le 2 chiamate si può dedurre che :
+
+- la prima è definita come _dot syntax_
+  - il parametro letto **self** viene capito come valore di **impl** (ovvero **Day**)
+- la seconda chiamata è quella normale
+  - qua **self** non può essere usato deve essere esplicitamente includo il tipo Day
+  - come mostrato `is_weekend(day: &Day)`
+
+**N.B.**  
+'self' pò essere usato SOLO dentro un blocco **impl**
+
+---
+
+## Vectors
+
+Prosegui dal minuto 55.55 dek video YT
+
 https://www.youtube.com/watch?v=ygL_xcavzQ4
