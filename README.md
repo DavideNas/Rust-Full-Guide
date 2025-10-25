@@ -720,6 +720,171 @@ Mettendo a confronto le 2 chiamate si può dedurre che :
 
 ## Vectors
 
-Prosegui dal minuto 55.55 dek video YT
+I vettori in Rust sono come array che possono crescere SOLO se mutabili e memorizzano dati di un solo tipo.
 
+```rs
+fn main() {
+  let vec1: Vec<i32> = Vec::new();  // creo un vettore vuoto
+  let mut vec2 = vec![1, 2, 3, 4];  // creo un vettore mutabile di numeri (i32 è impostaato come tipo default)
+  vec2.push(5);                     // aggiungo in coda a vec2 un numero "5"
+  println!("1st : {}", vec2[0]);    // stampa → 1st : 1
+  let second: &i32 = &vec2[1];      // non copio vec2[1] ma restituisco un riferimento (salvato in 'second')
+
+  // switch/case sul 2° elemento di 'vec2'
+  match vec2.get(1) {
+    Some(second) => println!("2nd : {}", second),   //  come Option<T> o un valore generico non definito
+    None => println!("No 2nd value"),               //  indica assenza di valore
+  }
+
+  // start loop in vec2
+  for i in &mut vec2 {
+    *i *= 2;                  // moltiplico ciascun elemento *2
+  }
+
+  // start loop in vec2
+  for i in &vec2 {
+    println!("{}", i);        // stampo ciascun valore dell'array (mutato per il loop precedente)
+  }
+
+  println!("Vec Length {}", vec2.len());      // stampa → Vec Length 5
+  println!("Pop : {:?}", vec2.pop())           // stampa → Pop : Some(10)
+}
+```
+
+**N.B.**
+
+- in `let second: &i32 = &vec2[1];` Rust può dedurre il tipo perché lo capisce dal valore restituito
+- Il parametro `{:?}` stampa il tipo (ovvero Option<T>) che rust traduce come **Some**
+- `vec2.pop()` legge l'ultimo elemento del vettore rimuovendolo da esso
+
+---
+
+## Le funzioni
+
+### Semplice funzione senza parametri
+
+```rs
+fn say_hello() {        // creo una semplice funzione 'say_hello'
+  println!("Hello");
+}
+
+fn main() {
+  say_hello();          // chiamo la funzione sopra
+}
+```
+
+### Funzione con passaggio di parametri
+
+```rs
+fn get_sum(x: i32, y: i32) {              // prende x e y come numeri (i32) passati alla chiamata
+  println!("{} + {} = {}", x, y, x+y);    // stampa → 5 + 4 = 9
+}
+
+fn main() {
+  get_sum(5, 4);        // chiama la funzione e gli passo 5 e 4 che sono poi importati come x e y
+}
+```
+
+### Funzione con valore di ritorno
+
+```rs
+fn get_sum_2(x: i32, y: i32) -> i32 {   // qua definisco il tipo di ritorno ( -> i32) dopo la definizione dei paramemtri
+  x + y     // ritorna x + y
+}
+
+fn main() {
+  println!("Sum of 5 + 4 {}", get_sum_2(5, 4));      // chiama la funzione e gli passo 5 e 4 che sono poi importati come x e y
+}
+```
+
+### Funzione con operazioni aggiuntive
+
+```rs
+fn get_double_sum(mut x: i32, mut y: i32) -> i32 {    // importo i numeri in variabili x e y mutabili
+  x *= 2;       // raddoppio x
+  y *= 2;       // raddoppio y
+  x + y         // ritorna il doppio della somma
+}
+
+fn main() {
+  println!("Double sum of 5 + 4 = {}", get_double_sum(5, 4));   // Stampa → Double sum of 5 + 4 = 18
+}
+```
+
+**N.B.**
+
+- le variabili x e y sono moltiplicati uno ad uno prima della somma
+- i valori di return sono distinti dalla mancanza del ; alla fine
+  - se mettessi solo `x + y;` la funzione non tornerebbe nulla
+  - potrei però scrivere un classico `return x + y;` che risolverebbe il problema
+
+### Funzione con ritorno miltiplo
+
+```rs
+// definisco il ritorno multiplo coi valori tramite parentesi
+fn get_2(x: i32) -> (i32, i32) {      // ritorna 2 numeri : -> (i32, i32)
+  return (x+1, x+2);                  // il primo numero è x+1 ; il secondo è x+2
+}
+
+fn main() {
+  let (val_1, val_2) = get_2(3);      // il valore (multiplo) di ritorno è distribuito sulla struttura composta da 'val_1' e 'val_2'
+  println!("Nums : {} {}", val_1, val_2);   // stampa → Nums : 4 5
+}
+```
+
+### Funzione di ritorno con passaggio di lista
+
+```rs
+// importo un riferimento a '&num_list' tramite '&[i32]' salvandolo in 'list'
+fn sum_list(list: &[i32]) -> i32 {
+  let mut sum = 0;  // creo una mutabile 'sum'
+
+  // itera nella lista facendo riferimento ad ogni elemento con '&val'
+  for &val in list.iter() {
+    sum += &val;
+  }
+  sum
+}
+
+fn main() {
+  // vero un vettore di numeri → [i32]
+  let num_list = vec![1, 2, 3, 4, 5];
+  // passo a sum_list un riferimeto alla lista '&num_list'
+  println!("Sum of list = {}", sum_list(&num_list));
+}
+```
+
+---
+
+## Generics
+
+Capita che bisogna lavorare con diversi tipi di dati, questo però a livello di parametri non sempre è prevedibile.  
+In Rust esiste il tipo generico **T**
+
+```rs
+use std::ops::Add;
+
+// per il valore di ritorno devo prevedere un operazione Add
+fn get_sum_gen<T:Add<Output = T>>(x: T, y: T) -> T {
+  // sommo i due valori importati nella funzione
+  return x + y;
+}
+
+fn main() {
+  println!("5 + 4 = {}", get_sum_gen(5, 4));            // stampa → 5 + 4 = 9
+  println!("5.2 + 4.6 = {}", get_sum_gen(5.2, 4.6));    // stampa → 5.2 + 4.6 = 9.8
+}
+```
+
+Come si può notare il generico T è più versatile del tipo definito i32, u16, etc...  
+Ma per far capire alla funzione che si tratta di un valore valido definisco il ritorno tramite l'espressione  
+`<T:Add<Output = T>>`, in questo modo comunico alla funzione (che gestisce i generics) che:
+
+- I valori T devono supportare l'operando Add (ovvero devono "capire" il +)
+- L'output è dello stesso tipo dei valori importati (se passo un double, ritorna un double)
+- Add comunque necessita dell'import `use std::ops::Add;` perché è un check extra
+
+---
+
+Prosegue dal minuto 1:11:13 del video YT
 https://www.youtube.com/watch?v=ygL_xcavzQ4
