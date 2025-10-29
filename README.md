@@ -40,6 +40,9 @@ Appena creata l'app verrà aggiunta una cartella col nome assegnatogli ed al suo
 Alcuni comandi utili
 
 ```sh
+cargo run               # per eseguire il programma Rust
+cargo r                 # stessa cosa di run
+
 cargo update            # per installare le dipendenze quando necessarie
 cargo add package_name  # per aggiungere un pacchetto
 ```
@@ -61,7 +64,7 @@ fn main() {
     let mut name = String::new();                   // variabile che salva l'input (il nome)
     let greeting = "Nice to meet you";               // messaggio di benvenuto
     io::stdin().read_line(&mut name)                // comando di cattura stringa (legge il nome quando INVIO)
-        .expect("Didn't Receive Input");            // messaggio di errore se non scivo nulla
+        .expect("Didn't Receive Input");            // messaggio di errore se non scrivo nulla
     println!("Hello, {}! {}", name.trim_end(), greeting);       // messaggio di benvenuto (stampa nome e messaggio)
 }
 ```
@@ -425,14 +428,33 @@ Prendiamo un esempio come un array di numeri consecutivi, voglio quindi effettua
 
 ```rs
 fn main() {
-  let arr_1 = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  let arr_1 = [1, 2, 3, 4, 5, 6, 7, 8, 9];    // array di lunghezza 9
 
   // stampe di valori
   println!("1st : {}", arr_1[0]);       // 1st : 1 (legge il primo elemento)
   println!("Length : {}", arr_1.len()); // Lenght : 9 (legge la lunghezza dell'array)
 ```
 
+Posso anche definire una porzione di array come uno slice (una fetta) che considera l'indice di partenza (inclusivo) e quello finale (esclusivo)
+
+```rs
+fn main(){
+  let arr_1 = [1, 2, 3, 4, 5, 6, 7, 8, 9];    // arr_1: [i32; 9]
+  let slice_1 = &arr_1[1 .. 5]; // [2, 3, 4, 5]; non conosce la lunghezza quindi serve attenzione (l'indice 5 → sul numero 6 non è incluso)
+  borrowing_slice(arr_1, slice_1);
+}
+
+fn borrowing_slice(arr: [i32; 9], slice: &[i32]) {
+  println!("{:?}", arr);
+  println!("{:?}", slice);
+  println!("length {}", slice.len());
+  println!("{} {}", slice[0], slice[1]);
+}
+```
+
 ### Loop
+
+Il ciclo `loop` come lo intendiamo in altri programmi è una sorta di `while(true)` che esegue il codice incluso tra parentesi fino a che non si verifica una condizione di `break`.
 
 Nell'esempio seguente il loop effettua un 'salto' dei valori che corrispondono ai numeri pari (se diviso 2 = 0 allora è pari)
 di conseguenza stampa solo i numeri dispari.
@@ -452,6 +474,37 @@ di conseguenza stampa solo i numeri dispari.
   }
 }
 ```
+
+Nel loop precedente il break avviene quando si verifica la condizione
+
+```rs
+if arr_1[loop_idx] == 9 {
+  break;
+}
+```
+
+ma in Rusto posso definire il break come fosse un return specificando la condizione direttamente dopo il break
+
+```rs
+break arr_1[loop_idx] == 9;
+```
+
+Rust è molto evoluto anche nella programmazione funzionale, permette cioé di salvare il risultato dei vari cicli in una variabile come ad esempio
+
+```rs
+let result = loop {
+  if arr_1[loop_idx] % 2 == 0 {
+      loop_idx +=1;
+      continue;
+    }
+    break arr_1[loop_idx] == 9;
+    loop_idx +=1;
+}
+
+println!("Final loop index : {}", result);
+```
+
+---
 
 ### While
 
@@ -722,12 +775,12 @@ Mettendo a confronto le 2 chiamate si può dedurre che :
 
 ## Vectors
 
-I vettori in Rust sono come array che possono crescere SOLO se mutabili e memorizzano dati di un solo tipo.
+I vettori in Rust sono array dinamici, ma possono crescere SOLO se mutabili e memorizzano dati di un solo tipo.
 
 ```rs
 fn main() {
   let vec1: Vec<i32> = Vec::new();  // creo un vettore vuoto
-  let mut vec2 = vec![1, 2, 3, 4];  // creo un vettore mutabile di numeri (i32 è impostaato come tipo default)
+  let mut vec2 = vec![1, 2, 3, 4];  // creo un vettore mutabile di numeri (i32 è impostato come tipo default ma posso anche dirlo con vec2<i32>)
   vec2.push(5);                     // aggiungo in coda a vec2 un numero "5"
   println!("1st : {}", vec2[0]);    // stampa → 1st : 1
   let second: &i32 = &vec2[1];      // non copio vec2[1] ma restituisco un riferimento (salvato in 'second')
@@ -1026,18 +1079,46 @@ fn main() {
   // stampa la lunghezza dell'oggetto hashmap (che ha 3 coppie valore)
   println!("Length : {}", heroes.len());      // stampa : "Length : 3"
 
+  let mut the_batman = None;
   // check sulla key che contiene "Batman" → prende &"Batman" perché viene fatta la get sul riferimento
   if heroes.contains_key(&"Batman") {
-    let the_batman = heroes.get(&"Batman"); // salvo il valore della chiave in 'the_batman'
-
-    // switch/case sulla variabile 'the_batman'
-    match the_batman {
-      // se presente la chiave : &"Batman"
-      Some(x) => println!("Batman is on the hero list"),
-      // se non presente la chiave : &"Batman"
-      None => println!("Batman is not in the hero list"),
-    }
+    the_batman = heroes.get(&"Batman"); // salvo il valore della chiave in 'the_batman'
   }
+
+  // switch/case sulla variabile 'the_batman'
+  match the_batman {
+    // se presente la chiave : &"Batman"
+    Some(x) => println!("Batman is on the hero list"),
+    // se non presente la chiave : &"Batman"
+    None => println!("Batman is not in the hero list"),
+  }
+}
+```
+
+Un altro esempio potrebbe essere questo :
+
+```rs
+fn main() {
+  let mut map = HashMap::new();
+
+  map.insert(0, "Hi");
+  map.insert(1, "Hi2");
+  println!("{:?}", map);
+
+  // legge il contenuto con chiave = 0
+  match map.get(&0) {
+    Some(str1) => println!("{}", str1),   // stampa "Hi"
+    None => println!("Doesn't exist in map"),
+  }
+
+  // legge il contenuto con chiave = 2 (che non esiste)
+  match map.get(&2) {
+    Some(str) => println!("{}", str),
+    _ => println!("Doesn't exist in map"),    // stampa messaggio
+  }
+
+  map.remove(&0);
+  println!("{:?}", map);  // stampa → {1: "Hi2"}
 }
 ```
 
@@ -1150,6 +1231,45 @@ Guardando con attenzione posso notare come :
 - in Rust il tipo Rectangle e Circle implementano l'interfaccia Shape ma rimangono sempre dei tipi di variabile
   - nessuna ereditarietà, non c'è polimorfismo ma solo composizione/implementazione
 
+Un altro esempio pratico potrebbe essere :
+
+```rs
+// consideriamo una struttura per definire un volatile
+
+fn main () {
+  let name = String::form("Bird");
+  let bird = Bird { name, attack: 5 };
+  bird.print_name();
+  println!("{} {}", bird.can_fly(), bird.is_animal());
+}
+
+struct Bird{
+  name: String,
+  attack: u64,
+}
+
+impl Bird {
+  fn print_name(&self) {
+    println!("{}", self.name);
+  }
+}
+
+// applico il "tratto" Animal alla struttura 'Bird'
+impl Animal for Bird {
+  // faccio una sorta di override di can_fly
+  fn can_fly(&self) -> bool { true }    // stampa → true
+
+  // se non scrivo questo override stamperà true (il valore di ritorno di 'is_animal' diretto del trait)
+  fn is_animal(&self) -> bool { false }   // stampa → false
+}
+
+// sapendo che Rust non supporta l'ereditarietà si definisce un tratto (simile ad un interface) come segue:
+trait Animal {
+  fn can_fly(&bool) -> bool;
+  fn is_animal(&self) -> bool { true }
+}
+```
+
 ---
 
 ## Packages Crates and Modules
@@ -1239,6 +1359,8 @@ Gli errori sono gestiti tramite il richiamoo di una macro 'panic' che esegue una
 panic!("My custom fatal error... finish him !!")
 ```
 
+Solitamente Rust evoca la macro panic come nel caso ci sia un errore nel runtime, quindi esce subito.
+
 Un esempio indiretto della gestione potrebbe essere:
 
 ```rs
@@ -1249,6 +1371,16 @@ fn main() {
 ```
 
 Qua non viene menzionata la macro 'panic!' ma sotto il cofano viene gestito l'errore che comunica l'errore "out of bounds"
+
+Un alternativa a 'panic!' è il metodo '.expect' che da la possibilità di personalizzare il messaggio senza "andare in panico".  
+Prendendo il caso precedente si ottiene:
+
+```rs
+fn main() {
+  let lil_arr = [1, 2];
+  println!("{}", lil_arr[10].expect("Errore di indice non previsto..."));
+}
+```
 
 Se invece prendiamo come esempio una creazione di un file, come nel codice seguente:
 
