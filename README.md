@@ -1,5 +1,7 @@
 # Rust-Full-Guide
 
+Guida basata sul corso YT : https://www.youtube.com/watch?v=ygL_xcavzQ4
+
 ## Intro
 
 Perché scegliere Rust?
@@ -877,14 +879,936 @@ fn main() {
 ```
 
 Come si può notare il generico T è più versatile del tipo definito i32, u16, etc...  
-Ma per far capire alla funzione che si tratta di un valore valido definisco il ritorno tramite l'espressione  
+Ma per far capire alla funzione che si tratta di un valore valido devo definire un Bound tramite l'espressione  
 `<T:Add<Output = T>>`, in questo modo comunico alla funzione (che gestisce i generics) che:
 
 - I valori T devono supportare l'operando Add (ovvero devono "capire" il +)
 - L'output è dello stesso tipo dei valori importati (se passo un double, ritorna un double)
 - Add comunque necessita dell'import `use std::ops::Add;` perché è un check extra
 
+Il bound di una funzione che gestisce i generics può essere di 2 tipi:
+
+```rs
+// I° modalità
+fn f<T: Bound>(...)   // come in questo caso
+// II° modalità
+fn f<T>(...) where T: Bound // separando le definizioni rendendo il codice più pulito
+```
+
+Seguendo la seconda opzione l'esempio precedente sarebbe stato quindi
+
+```rs
+fn get_sum_gen<T>(x: T, y: T) -> T
+  where T:Add<Output = T> {
+  return x + y;
+}
+```
+
+Tabella di riferimento per le lettere usate nelle Generics
+
+| Lettera       | Uso tipico                                      | Significato convenzionale |
+| ------------- | ----------------------------------------------- | ------------------------- |
+| `T`           | **Type**                                        | Tipo generico "di base"   |
+| `U`, `V`, `W` | Tipi aggiuntivi (secondo, terzo, quarto, ecc.)  |                           |
+| `E`           | **Error** type (es. in `Result<T, E>`)          |                           |
+| `K`, `V`      | **Key / Value** (es. in mappe, `HashMap<K, V>`) |                           |
+| `'a`, `'b`    | **Lifetime** (non tipi, ma parametri di durata) |                           |
+
 ---
 
-Prosegue dal minuto 1:11:13 del video YT
-https://www.youtube.com/watch?v=ygL_xcavzQ4
+## Ownership
+
+Per comprendere bene cosa sia la Ownership bisogna fare un focus sui tipi di memoria usata da un programma.  
+Questi tipi di memoria sono:
+
+- Stack: la memoria (detta memoria a pila) che gestisce i valori in un formato LIFO
+  - Questa memoria deve avere una dimensione fissa definita
+- Heap: quando si mette un dato nella memoria heap (o memoria cumulativa) serve richiedere una certa quantità di spazio.
+  - L'OS trova spazio disponibile e ritorna un indirizzo diretto a quella specifica porzione di memoria.
+  - Questa indirizzo viede definito come puntatore.
+
+Ci sono poi alcune regole fondamentali da prendere in considerazione per capire la ownership (o proprietà) di un valore:
+
+1. Ogni valore ha una variabile che è chiamata owner (proprietario)
+2. Esiste un solo proprietario (un solo owner) per volta
+3. Quando il proprietario "esce" dallo scope del programma il valore sparisce (Rust gestisce la deallocazione in automatico)
+
+Per comprendere correttamente questi passaggi considera il codice seguente:
+
+```rs
+fn main() {
+  let str1 = String::from("World");   // creo un oggetto stringa passando il parametro "World" al costruttore
+  let str2 = str1;                    // fa il move del valore → da str1 a str2
+  println!("Hello {}", str1);         // ERRORE : prestito del valore spostato str1
+}
+```
+
+Questo mostra che dopo lo spostamento della stringa "World" da str1 a str2, il parametro str1 viene deallocato da Rust.  
+Non è più possibile ottenere un valore direttamente da str1 perché semplicemente non esiste più (dopo il move).
+
+Se invece facessi un clone tramite metodo `.clone` avverrebbe questo
+
+```rs
+fn main() {
+  let str1 = String::from("World");
+  let str2 = str1.clone();            // fa una copia esatta del valore str1 in str2 (adessso ho 2 copie)
+  println!("Hello {}", str1);         // VALIDO: str1 non è stato deallocato adesso stampa "Hello World"
+}
+```
+
+Per affrontare le varie manipolazioni di stringa considera questa serie di funzioni come esempio:
+
+```rs
+// I° funzione : stampa una stringa come composizione di un valore passato al suo interno
+fn print_str(x: String) {
+  println!("A string {}", x);     // A string 'x' → dove x è il valore passato
+}
+
+// II° funzione : stampa una stringa (come prima) e ritora il valore della stringa passata
+// -> String : definisce il valore di ritorno
+fn print_return_str(x: String) -> String {
+  println!("A string {}", x);     // A string 'x' → dove x è il valore passato
+  x                               // ritorna sempre 'x'
+}
+
+// III° funzione : importa un riferimento alla stringa che viene modificata al suo interno
+// name è di tipo → "&mut String" ovvero un riferimento alla variabile passata (che può averne al massimo uno)
+fn change_str(name: &mut String) {
+  name.push_str(" is happy");     // modifica 'name' aggiungendo " is happy", dove 'name' è la stringa passata
+  println!("Message : {}", name); // stampa "Message : Dave is happy" (Dave è il parametro importato in 'name')
+}
+
+fn main() {
+  let str1 = String::from("World");
+
+  // stampe semplici
+  print_str(str1);                    // chiama la funzione
+  let str3 = print_return_str(str1);  // str3 ottiene il valore di ritorno di 'print_return_str'
+  println!("str3 = {}", str3);        // stampa il valore salvato in str3 → str3 = World
+
+  // manipolazione di stringa
+  // str2 è una mutabile (ovvero è permessa la manipolazione della stringa)
+  let mut str2 = String::from("Dave");  // creo un oggetto stringa (mutabile) che contiene il nome "Dave"
+  change_string(&mut str2);             // chiamo la funzione 'change_string' e gli passo il riferimento alla variabile 'str2'
+}
+```
+
+**N.B.**
+
+- nella terza funzione devo passare un riferimento alla variabile mutabile tramite **&mut** che ne permette la modifica
+- questa variabile viene importata come **name: &mut String** che da la possibilità di prendere questo riferimento e modificarlo tramite 'name'
+
+**IMPORTANTE** : in Rust una variabile può avere SOLO una versione mutabile alla volta (all'interno della funzione)
+
+---
+
+## Gli Hashmaps
+
+Gli hashmaps in Rust sono usati per memorizzare le coppie **key:value**.  
+Per usarli è necessario l'import della libreria come descritto nel codice seguente:
+
+```rs
+// faccio l'import della classe HashMap
+use std::collections::HashMap;
+
+fn main() {
+  // creo l'oggetto 'heroes'
+  let mut heroes = HashMap::new();
+  heroes.insert("Superman", "Clark Kent");    // aggiungo la I° coppia Key-Value
+  heroes.insert("Batman", "Bruce Wayne");     // aggiungo la II°
+  heroes.insert("The Flash", "Barry Allen");  // aggiungo la III°
+
+  // inizio loop
+  for(k, v) in heroes.iter() {    // itera prendendo la coppia 'k' (key), v (value)
+    println!("{} = {}", k, v);    // e la stampa come ad esempio "Superman = Clark Kent"
+  }
+
+  // stampa la lunghezza dell'oggetto hashmap (che ha 3 coppie valore)
+  println!("Length : {}", heroes.len());      // stampa : "Length : 3"
+
+  // check sulla key che contiene "Batman" → prende &"Batman" perché viene fatta la get sul riferimento
+  if heroes.contains_key(&"Batman") {
+    let the_batman = heroes.get(&"Batman"); // salvo il valore della chiave in 'the_batman'
+
+    // switch/case sulla variabile 'the_batman'
+    match the_batman {
+      // se presente la chiave : &"Batman"
+      Some(x) => println!("Batman is on the hero list"),
+      // se non presente la chiave : &"Batman"
+      None => println!("Batman is not in the hero list"),
+    }
+  }
+}
+```
+
+---
+
+## Le strutture
+
+In Rust le strutture sono tipi di dati personalizzati progettati per raggruppare/includere diversi campi al loro interno.
+
+Prendi come esempio il codice seguente:
+
+```rs
+fn main() {
+  // creo una struttura Customer (contiene i valori: name, address e balance)
+  struct Customer {
+    name: String,
+    address: String,
+    balance: f32,
+  }
+
+  // popolo una variabile con la struttura 'Customer'
+  let mut bob = Customer{
+    name: String::from("Bob Smith"),      // assegno il nome
+    address: String::from("55 Main St"),  // l'indirizzo
+    balance: 234.50                       // ed il saldo
+  };
+
+  // posso poi modificare un valore del customer semplicemente accedendo al suo attributo
+  // modifico quindi l'indirizzo facendo 'bob.address'
+  bob.address = String::from("505 Main St");
+}
+```
+
+Posso poi creare una struttra coi Generics, prendiamo come esempio il codice seguente:
+
+```rs
+fn main() {
+  // creo una struttura con 2 generici (T ed U)
+  struct Rectangle<T, U> {
+    length: T,      // assegno il primo generico T a length
+    height: U,      // assegno il secondo generico U a height
+  }
+  // creo una variabile 'rec' di tipo Rectangle
+  let rec = Rectangle {
+    length: 4,      // il primo valore lenght = 4
+    height: 10.5    // il secondo valore height = 10.5
+  }
+}
+```
+
+---
+
+## I Trait
+
+I Trait in Rust sono una sorta di interfacce che definiscono le proprietà che devono avere gli oggetti che ne prendono il loro 'tratto'.
+
+Considera il codice seguente:
+
+```rs
+fn main() {
+  // costante del PI greco
+  const PI: f32 = 3.141592;
+
+  // definisco il tratto Shape (un contratto / interface)
+  trait Shape {
+    // ciascun elemento deve avere 2 funzioni 'new' e 'area'
+    fn new(length: f32, width: f32) -> Self;
+    fn area(&self) -> f32;
+  }
+
+  // creo 2 strutture coi valori 'length' e 'width'
+  struct Rectangle {length: f32, width: f32};
+  struct Circle {length: f32, width: f32};
+
+  // implemento il tratto Shape nella struttura Rectangle
+  impl Shape for Rectangle {
+    // definisco la funzione new definendo il valore '&self' con 'Rectangle'
+    fn new(length: f32, width: f32) -> Rectangle {
+      return Rectangle{length, width};
+    }
+    // definisco la funzione area definendo il valore di ritorno 'f32' con la moltiplicazione tra i 2 parametri della struttura 'lenght' e 'width'
+    fn area(&self) -> f32 {
+      return self.length * self.width;
+    }
+  }
+
+  // implemento il tratto Shape nella struttura Circle
+  impl Shape for Circle {
+    // definisco la funzione new definendo il valore '&self' con 'Circle'
+    fn new(length: f32, width: f32) -> Circle {
+      return Circle{length, width};
+    }
+    // definisco la funzione area definendo il valore di ritorno 'f32' con il calcolo matematico relativo all'area del cercio
+    fn area(&self) -> f32 {
+      return (self.length / 2.0).powf(2.0) * PI;
+    }
+  }
+
+  let rec: Rectangle = Shape::new(10.0, 10.0);
+  let circ: Circle = Shape::new(10.0, 10.0);
+  println!("Rec Area : {}", rec.area());
+  println!("Circ Area : {}", circ.area());
+}
+```
+
+Guardando con attenzione posso notare come :
+
+- con l'implementation di Shape creo un tipo di dato più ricco per la Struttra Shape
+  - aggiunge metodi quindi si "comporta" come una classe
+- in Rust il tipo Rectangle e Circle implementano l'interfaccia Shape ma rimangono sempre dei tipi di variabile
+  - nessuna ereditarietà, non c'è polimorfismo ma solo composizione/implementazione
+
+---
+
+## Packages Crates and Modules
+
+E' giusto definire alcune caratteristiche che riguardano i moduli:
+
+- **Crates** sono moduli creati per produrre una libreria o un eseguibile
+- **Modules** servono ad organizzare e gestire la privacy (ovvero ciò che deve essere **public** o **private**)
+- **Packages** fanno la build, il rest e lo sharing del **crates**
+- **Paths** un modo per recperare un componente come una struttura, una funzione
+
+Prendiamo un caso esempio, voglio creare un modulo per un ristorante:
+
+- creo una cartella **/restaurant/** con all'interno un file **mod.rs**
+- scrivo quindi questo codice nel file **/restaurant/mod.rs**
+
+```rs
+// dichiaro un nuovo modulo pizza_order
+mod pizza_order {
+  // creo una struttura public per Pizza, coi parametri: 'dough', 'cheese' e 'topping'
+  pub struct Pizza {
+    pub dough: String,
+    pub cheese: String,
+    pub topping: String,
+  }
+
+  // creo una funzione lunch che necessita dell'implementazione della struct Pizza
+  impl Pizza {
+    // passo l'attributo 'toppin' come parametro e definisco il ritorno come 'Pizza' (la struttura definita sopra)
+    pub fn lunch(topping: &str) -> Pizza {
+      // definisco i 3 parametri interni
+      Pizza {
+        dough: String::from("regular dough"),   // assegno un valore statico a douch → "regular dough"
+        cheese: String::from("mozzarella"),     // assegno un valore statico a cheese → "mozzarella"
+        topping: String::from(topping),         // assegno un valore dinamico a topping → ovvero il 'topping: &str' importato nella funzione
+      }
+    }
+  }
+  // creo un secondo modulo interno 'help_customer'
+  pub mod help_customer{
+    // definisco una funzione semplice che stampa un messaggio
+    fn seat_at_table() {
+      println!("Customer seated at table");
+    }
+    // funzione che stampa il messaggio relativo alla pizza ordinata (con il topping)
+    fn serve_customer(cust_pizza: super::Pizza) {
+      println!("The customer is served a regualr pizza with {}", cust_pizza.topping);
+    }
+    // definisco la funzione principale per la presa dell'ordine
+    pub fn take_order() {
+      seat_at_table();
+      // creo un a variabile Pizza che inizializza il topping come "veggies
+      let cust_pzza: super::Pizza = super::Pizza::lunch("veggies");
+      // chiamo la funzione per "servire la pizza orfinata"
+      serve_customer(cust_pizza);
+    }
+  }
+}
+
+// funzione principale 'order_food' chiamata dal main
+pub fn order_food() {
+  // richiamo la funzione interna passando all'interno dei namespaces
+  crate::restaurant::pizza_order::help_customer::take_order();
+}
+```
+
+Quindi implemento il modulo nel file **main.rs**
+
+```rs
+mod restaurant;   // dichiaro il modulo che voglio usare → 'restaurant'
+use crate::restaurant::order_food;  // includo il nome della funzione 'restaurant::order_food' usata per accedere al modulo
+
+fn main() {
+  // chiamo la funzione 'order_food()'
+  order_food();
+}
+```
+
+---
+
+## Files and Errors
+
+Rust non ha una gestione delle eccezioni come nei linguaggi più comuni.  
+Gli errori sono gestiti tramite il richiamoo di una macro 'panic' che esegue una stampa prima di uscire dal runtime come :
+
+```rs
+panic!("My custom fatal error... finish him !!")
+```
+
+Un esempio indiretto della gestione potrebbe essere:
+
+```rs
+fn main() {
+  let lil_arr = [1, 2];
+  println!("{}", lil_arr[10]);
+}
+```
+
+Qua non viene menzionata la macro 'panic!' ma sotto il cofano viene gestito l'errore che comunica l'errore "out of bounds"
+
+Se invece prendiamo come esempio una creazione di un file, come nel codice seguente:
+
+```rs
+use std::fs::File;
+// considerando che il Result prevede 2 varianti : Ok e Err
+  // enum Result<T, E> {
+  // Ok(T),
+  // Err(E), }
+  // Dove 'T' rappresenta la generics del tipo di dato di ritorno
+  // 'E' rappresenta la generics del tipo di errore
+
+fn main() {
+  // creo una variabile per il path del file da creare
+  let path = "lines.txt";
+  // chiamo il metodo di creazione file che salva il Result in 'output'
+  let output = File::create(path);
+
+  // switch/case su output (vedi referenza ad inizio snippet)
+  let mut output = match output {
+    // se tutto a posto ritorna il file stesso
+    Ok(file) => file,
+    // se da errore chiama la macro panic! e ritorna il messaggio
+    Err(error) => {
+      panic!("Problem creating file ; {:?}", error);
+    }
+  };
+
+  // chiamo la macro write! che si occupa di scrivere nel file
+  write!(output, "Just some\nRandom words")
+    // se ci sono errori lancia un messaggio di errore
+    .expect("Failed to write to file");
+
+  // apro il file in input
+  let input = File::open(path).unwrap();
+  // creo un buffer dati che legge il contenuto del file
+  let buffered = BufReader::new(input);
+  // loop del buffer: linea per linea
+  for line in buffered.lines() {
+    // stampa la linea corrente, il metodo .unwrap() elimina la &, da il contenuto e non il risultato
+    println!("{}", line.unwrap());
+  }
+
+  // creo un secondo file
+  let output2 = File::create("rand.txt");
+  // switch/case su output2
+  let output2 = match output2 {
+    // come prima se ok ritorna il file creato
+    Ok(file) => file,
+    // se da errore apre un secondo switch/case sul tipo di errore
+    Err(error) => match error.kind() {
+      // se non trova alcun tipo di errore definito
+      ErrorKind::NotFound => match File::create("rand.txt") {
+        // ...prova a ricreare il file
+        Ok(fc) => fc,
+        // se da ancora errore esce comunicado l'errore "Can't create file" con le specifiche
+        Err(e) => panic!("Can't create file: {:?}", error),
+      },
+      // per altre casistiche non previste, esce dal runtime chiamando la macro panic! e stampando l'errore
+      _other_error => panic!("Problem opening file : {:?}", error),
+    },
+  };
+}
+```
+
+---
+
+## Gli iterator
+
+Come già visto gli iterator servono a ciclare all'interno di un loop per scansionare ciascun elemento dell'array.
+
+```rs
+fn main() {
+  // creo il mio solito array di numeri
+  let mut arr_it = [1, 2, 3, 4];
+  // scansiono ogni elemento tamite metodo .iter
+  for val in arr_it.iter() {
+    println!("{}", val);    // stampa ciascun elemento (uno ad uno)
+  }
+  // creo una variabile per l'iter sull'array
+  let mut iter1 = arr_it.iter();
+  // Questo mi permette di scegliere l'elemento manualmente
+  // Il metodo .next() prende l'elemento iniziale dell'iterator
+  println!("1st : {:?}", iter1.next());   // stampa il primo della lista → 1st : Some(1)
+}
+```
+
+---
+
+## Le Closures
+
+Le Closure sono funzioni anonime, e sono come salvate in una variabile. Sono utili a passare una funzione in un'altra funzione.  
+Hanno una struttura simile a : `let var_name = |parameters| -> return_type {BODY}`
+
+```rs
+fn main() {
+  // variabile che prende in carico una funzione closure
+  let can_vote = |age: i32| {   // passo il parametro 'age'
+    age >= 18           // ritorna true SOLO se maggiorenne
+  };
+  // stampa la stringa con il risultato diretto della chiamata alla closure 'can_vote'
+  printl!("Can vote : {}", can_vote(8));
+}
+```
+
+Un'altra delle caratteristiche fondamentali delle closure sta nella possibilità di stampare le variabili usate al suo interno.  
+Vedi l'esempio sotto per capire meglio il loro utilizzo:
+
+```rs
+fn main() {
+  // creo una semplice variabile mutabile
+  let mut samp1 = 5;
+  // definisco una closure per stamparla
+  let print_var = || println!("samp1 = {}", samp1);   // stampa → samp1 = 5
+  // chiamo la closure
+  print_var();
+  // modifico ancora la variabile = 10
+  samp1 = 10;
+  // creo una funzione closure che aggiunge 1
+  let mut change_var = || samp1 += 1;
+  change_var();         // chiama la closure per aggiungere 1 a 'samp1'
+  println!("samp1 = {}", samp1);      // stampa → samp1 = 11
+  // reimposto la variabile a 10
+  samp1 = 10;
+  println!("samp1 = {}", samp1);      // stampa → samp1 = 10
+}
+```
+
+> Come si può notare 'samp1' è usata sia dentro che fuori la funzione closure.
+
+Un'altra possibilità di implementazione è quella di passare una funzione nella closure.  
+Prendiamo come esempio il codice seguente:
+
+```rs
+fn main() {
+  // definisco una funzione generica che accetta 2 interi (a e b)
+  // ed una funzione 'func' che prende due i32 e restituisce un i32.
+  fn use_func<T>(a: i32, b: i32, func: T) -> i32
+  where T: Fn(i32, i32) -> i32 {    // vincolo: T deve essere una closure o funzione compatibile
+    func(a, b)    // ritorna il risultato dell'operazione
+  }
+
+  // definisco quindi 2 closure (funzioni anonime)
+  // Una per la somma:
+  let sum = |a, b| a+b;
+  // Una per il prodotto:
+  let prod = |a, b| a*b;
+
+  // Chiamo la funzione use_func passando a=5, b=4 e la closure 'sum'
+  println!("5 + 4 = {}", use_func(5, 4, sum));  // stampa → 5 + 4 = 9
+  // Chiamo la funzione use_func passando a=5, b=4 e la closure 'prod'
+  println!("5 * 4 = {}", use_func(5, 4, prod)); // stampa → 5 * 4 = 20
+}
+```
+
+Il Bound come già visto serve a definire un vincolo/clausula che viene separata in questo caso dalla definizione della funzione tramite 'where'.
+
+In alternativa avrei potuto usare l'altra espressione `fn f<T: Bound>(...)`
+
+```rs
+fn use_func<T: Fn(i32, i32) -> i32>(a: i32, b: i32, func: T) -> i32 {
+  // [...]
+}
+```
+
+> Questa versione è più compatta ma meno leggibile
+
+--
+
+## Lo smart pointer Box
+
+Come abbiamo già visto lo stack è una porzione di memoria che definisce una porzione di memoria in formato LIFO.  
+Il Box è uno smart pointer simile allo stack.
+
+Per capire meglio creo uno snippet che lo implementa in maniera molto basilare:
+
+```rs
+fn main(){
+  // Creo una variabile Box inizializzata col numero 10
+  let b_int1 = Box::new(10);
+  println!("b_int1 = {}", b_int1);    // stampa → b_int1 = 10
+}
+```
+
+Prendiamo adesso un esempio diverso integrando una struttura come segue:
+
+```rs
+fn main(){
+  struct Point<T> {
+      x: T,
+      y: T,
+  }
+
+  impl<T> Point<T> {
+      fn new(x: T, y: T) -> Self {
+          Point { x, y }
+      }
+  }
+
+  let point1 = Point::new(5, 6);
+  println!("{:?}", point1);  // stampa → Point { x: 5, y: 6 }
+}
+```
+
+> Qua la struttura non necessita del Box poiché è limitata all'utilizzo di un solo nodo ma serve per capire il prossimo esempio...
+
+Nell'esempio che segue si crea una struttura più complessa ad albero :
+
+- ogni chiave ha 2 sottonodi, left e right
+- a loro volta ciascuno di questi (se inizializzati) possono avere dei nodi figli (left e right)
+- e così via...
+
+Potenzialmente la struttura ha un heap infinito che se non limitato potrebbe occupare tutta la memoria (con calma ma potrebbe arrivarci in linea teorica.....).  
+Qui lo "smart pointer" **Box** agisce proprio come una scatola con uno spazio limitato che definisce un puntatore a un valore T allocato nell' **Heap**,  
+permettendo di definire tipi ricorsivi con dimensione finita.
+
+```rs
+fn main(){
+  // creo una struttura ad albero
+  struct TreeNode<T> {
+    // ciascun nodo può avere :
+    // un nodo sinistro
+    pub left: Option<Box<TreeNode<T>>>,
+    // un nodo destro
+    pub right: Option<Box<TreeNode<T>>>,
+    // una chiave
+    pub key: T,
+  }
+  // qua implemento il tipo T che è il generico compreso nella struttura 'TreeNode'
+  impl<T> TreeNode<T> {
+    // creo una funzione new che gestisce la chiave come parametro primario
+    pub fn new(key: T) -> Self {
+      // inizializza i 2 nodi left e right a None mantenendo valida la chiave passata
+      TreeNode { left: None, right: None, key, }
+    }
+    // imposta il nodo sinistro dell'albero e ritorna il nodo corrente
+    pub fn left(mut self, node: TreeNode<T>) -> Self {
+      // assegna al campo 'left' il nuovo nodo, incapsulato in Box e Option
+      self.left = Some(Box::new(node));
+      self
+    }
+    // imposta il nodo destro dell'albero e ritorna il nodo corrente
+    pub fn right(mut self, node: TreeNode<T>) -> Self {
+      // assegna al campo 'right' il nuovo nodo, incapsulato in Box e Option
+      self.right = Some(Box::new(node));
+      self
+    }
+  }
+
+  // inizializzo una variabile 'node1' di tipo TreeNode
+  let node1 = TreeNode::new(1)    // il primo è la chiave → 1
+    .left(TreeNode::new(2))       // il nodo left → 2 , che è a sua volta la chiave di un nuovo TreeNode
+    .right(TreeNode::new(3));     // il nodo right → 3 , che è a sua volta la chiave di un nuovo TreeNode
+}
+```
+
+Qua l'utilizzo di Box alloca una sorta di Stack sulla memoria **Heap**.
+Serve a limitare la ricorsione ad albero di TreeNode (Rust non permette le ricorsioni infinite).
+
+Quindi quando definisco il nodo left o right all'interno della struttura con `Option<Box<TreeNode<T>>>`, sto dicendo che:
+
+- **Option** è il tipo che permette di rendere una variabile nulla
+- **Box** funge sa "smart pointer" per allocare una dimensione finita sulla memoria heap
+- senza **Box** ovvero con `Option<TreeNode<T>>` otterrei un errore come **_recursive type `TreeNode` has infinite size_**
+
+nelle definizioni interne dei metodi
+
+- in `pub fn new(key: T) -> Self` il comando **-> Self** ritorna proprio il tipo della struct
+- in `pub fn right(mut self, node: TreeNode<T>) -> Self` la variabile **mut self** è un riferimento alla classe (manipolata all'interno della funzione)
+- `self` alla fine → ritorno l’oggetto concreto
+- `self.left` → sto accedendo e modificando il campo **_left_** della struct
+
+---
+
+## Concurrency
+
+La cocorrenza in Rust permette l'esecuzione di più blocchi di codice nello stesso momento. Questo stile di esecuzione è definito come programmazione parallela.  
+Ci sono una serie di problemi comuni che riguardano al programmazione parallela:
+
+1. I Thread solitamente cercano di accedere ai dati in un ordine sbagliato
+2. Più thread sono bloccati in fase di esecuzione per via di una confusione sull'ordine di priorità ed i requisiti da rispettare per procedere.
+
+Se per dire un thread si avvia SOLO se ha accesso ad una risorsa che però è presa da un secondo thread che la occupa:
+
+- Il primo thread ha l'ok per avviarsi
+- Il secondo thread occupa la risorsa impedendo l'avvio del primo
+- Il sistema va in confusione facendo scelte casuali e creando anche problemi di prestazione
+
+In Rust questa gestione avviene in automatico perché le impostazioni di priorità sono gestite internamente risolvendo gran parte di questi problemi.
+
+In questo esempio si spiega come fare ad implementare la programmazione parallela in Rust:
+
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+  // faccio partire un thread secondario
+  thread::spawn(|| {
+    // start spawned loop
+    for i in 1..25 {
+      println!("Spawned thread : {}", i);
+      // ferma il loop per 1 millisecondo
+      thread::sleep(Duration::from_millis(1));
+    }
+  });
+
+  // start main loop
+  for i in 1..20 {
+    println!("Main thread : {}", i);
+    // ferma il loop per 1 millisecondo
+    thread::sleep(Duration::from_millis(1));
+  }
+}
+```
+
+Nel codice si può notare come il loop secondario (quello di "Spawned thread") abbia una durata maggiore → fino a 25.  
+Il problema è che il "Main thread" cicla fino al 20. Così facendo quando conclude esce dal runtime lasciando lo "Spawned thread" incompleto.
+
+C'è una soluzione che Rust offre per far fronte a questi problemi di interruzione improvvisa, mostrata nella revisione del codice precedente come segue:
+
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+  // creo una variabile di riferimento al tread istanziato
+  let thread1 = thread::spawn(|| {
+    for i in 1..25 {
+      println!("Spawned thread : {}", i);
+      thread::sleep(Duration::from_millis(1));
+    }
+  });
+
+  for i in 1..20 {
+    println!("Main thread : {}", i);
+    thread::sleep(Duration::from_millis(1));
+  }
+
+  // faccio una .join() dello "Spawned thread" sul main
+  // mette in attesa la chiusura del runtime dando la possibilità a thread1 di finire
+  thread1.join().unwrap();
+}
+```
+
+Per fare un esempio concreto (real world) vediamo come si può integrare questa programmazione parallela con un esempio di gestione in un sistema bancario.
+
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+  // creo una struttura 'Bank'
+  pub struct Bank {
+    // ... con un solo dato: il bilancio del conto
+    balance: f32
+  }
+  // metodo 'withdraw' per il prelievo del denaro
+  fn withdraw(the_bank: &mut Bank, amt: f32) {
+    // sottraggo 'amt' (importo) dal bilancio del conto passato come riferimento mutabile
+    the_bank.balance -= amt;
+    // stampo il nuovo saldo
+    println!("Balance : {}", the_bank.balance);
+  }
+  // creo un'stanza mutabile della banca con saldo iniziale a 100.0
+  let mut bank = Bank{ balance: 100.0 };
+
+  // effettuo un primo prelievo di 5.00 dal main thread
+  withdraw(&mut bank, 5.00);
+
+  // stampo il saldo dopo il primo prelievo
+  println!("Balance : {}", bank.balance);
+
+  // metodo 'customer' per la simulazione di un prelievo da parte di un utente
+  fn customer(the_bank: &mut Bank) {
+    // esegue un prelievo per l'utente passando : riferimento mutabile del saldo bancario e l'importo da prelevare 5.00
+    withdraw(the_bank, 5.00);
+  }
+
+  // creo un nuovo thread di esecuzione
+  thread::spawn(|| {
+    // all'interno del thread creo una nuova istanza di 'Bank' (separata da quella del main)
+    // per praticità non intervengo sullo stesso conto (richiederebbe un implementazione Mutex che evita una Race Condtion)
+    let mut bank = Bank { balance: 100.0 };
+
+    // ... ma richiamo in parallelo la stessa funzione
+    customer(&mut bank)
+  })
+  // con .join aspetto che il thread finisca prima di terminare il main thread
+  .join()
+  // .unwrap gestisce il risultato del .join (panicherà se il thread ha generato un errore)
+  .unwrap();
+}
+```
+
+---
+
+## Arc & Mutex
+
+Come abbiamo visto prima il riferimento della banca è stato creato prima nel main thread e poi all'interno del thread istanziato alla fine.  
+Questo perché in Rust la programmazione parallela non permette una modifica/scrittura contemporanea della stessa variabile senza compromettere l'accesso ai dati.  
+Questa concomitanza conflittuale è chiamata 'Race Condition'.
+
+Esiste una soluzione che richiede l'implementazione di alcune "funzioni di blocco" che impongono ad una determinata operazione
+il controllo di blocco della variabile o del dato al momento della richiesta.
+
+Questo tipo di implementazione in Rust avviene grazie ad alcuni componenti:
+
+- Arc (Atomic Reference Counter): **Arc<T>** è uno smart pointer thread-safe che consente la condivisione su + threads della **ownership** di un dato.
+- Mutex (Mutual Exclusion): **Mutex<T>** protegge l'accesso mutabile a un dato condiviso. Un solo thread per volta può bloccarlo per scrivere/leggere il valore.
+
+L'implementazione avviene tramite una struttura come `Arc<Mutex<Bank>>` dove Bank è **T**, che permette l'accesso sicuro e condiviso tra threads.
+
+Si può quindi rivedere il codice precedente con l'implementazione di Arc e Mutex come segue:
+
+```rs
+use std::sync::{Arc, Mutex};  // importo Arc (Atomic Reference Counter) e Mutex (mutua esclusione)
+use std::thread;              // importo le funzionalità per creare e gestire thread
+
+fn main() {
+    // definisco una struttura 'Bank'
+    pub struct Bank {
+        // contiene un solo campo: il saldo del conto
+        balance: f32,
+    }
+
+    // funzione che effettua un prelievo
+    fn withdraw(the_bank: &mut Bank, amt: f32) {
+
+        // check che controlla il saldo attuale per verificare che l'importo richiesto sia disponibile sul conto
+        if the_bank.balance < amt {
+          println!("Insufficient funds: balance = {}, attempted withdrawal = {}", the_bank.balance, amt);
+        } else {
+          // riduce il saldo dell'importo specificato
+          the_bank.balance -= amt;
+          // stampa il saldo aggiornato
+          println!("Balance : {}", the_bank.balance);
+        }
+    }
+
+    // funzione che rappresenta un cliente che interagisce con la banca
+    fn customer(the_bank: Arc<Mutex<Bank>>) {
+        // blocca il Mutex per ottenere accesso esclusivo e mutabile alla struct Bank
+        let mut bank_ref = the_bank.lock().unwrap();
+        // effettua un prelievo di 5.00
+        withdraw(&mut bank_ref, 5.00);
+        // il lock viene automaticamente rilasciato alla fine del blocco (quando bank_ref va fuori scope)
+    }
+
+    // creo l'istanza iniziale della banca, con saldo 100.0,
+    // e la incapsulo in un Arc<Mutex<T>> per permettere accesso condiviso e sicuro tra thread
+    let bank = Arc::new(Mutex::new(Bank { balance: 100.0 }));
+
+    // crea 10 thread "clienti"
+    let mut handles: Vec<_> = (0..10).map(|| {
+      let bank_ref = bank.clone();
+      thread::spawn(|| {
+        customer(bank_ref)
+      })
+    }).collect();
+
+    // aggiungo un nuovo thread in coda ai precedenti
+    handles.push({
+      // clono il riferimento a 'bank'
+      let bank_ref = Arc::clone(&bank);
+      // faccio lo spawn del nuovo thread chiamando 'customer' e passando il riferimento bank_ref
+      thread::spawn(|| customer(bank_ref))
+    });
+
+    // prelievo nel main
+    {
+      // blocco il Mutex per ottenere l'accesso esclusivo al saldo
+        let mut bank_ref = bank.lock().unwrap();
+        // effettuo un prelievo
+        withdraw(&mut bank_ref, 10.00);
+    } // qui il Mutex viene sbloccato automaticamente
+
+    //
+    for handle_index in handles {
+      handle_index.join().unwrap();
+    }
+
+    // alla fine stampo il saldo finale
+    println!("Final Balance : {}", bank.lock().unwrap().balance);
+}
+```
+
+Qua avviene l'implementazione delle 2 componenti :
+
+```rs
+let bank = Arc::new(Mutex::new(Bank { balance: 100.0 }));
+```
+
+Dove:
+
+- **Arc** : crea una prima istanza condivisibile concorrente per la lettura o l'accesso concorrente
+- **Mutex** : si implementa per permettere la modifica del dato (un solo thread per volta)
+
+  - Solo un thread alla volta può leggere
+  - Solo un thread alla volta può scrivere
+
+Per accedere in maniera "esclusiva" alla banca utilizzo il metodo **.lock** :
+
+```rs
+let mut bank_ref = the_bank.lock().unwrap();  // Nella funzione 'customer', poi passato a 'withdraw'
+
+let mut bank_ref = bank.lock().unwrap();    // nel main thread, tra le parentesi {}, per un prelievo aggiuntivo sempre tramite 'withdraw'
+
+bank.lock().unwrap().balance    // nella macro `println!` per la verifica del conto
+```
+
+Altra cosa da notare è che quando creo le referenze per la banca (per il passaggio della referenza a 'withdraw') la imposto come segue:
+
+```rs
+let mut bank_ref = the_bank.lock().unwrap();    // Nella funzione 'customer'
+
+let bank_ref = bank.clone();  // nel loop .map assegnato al vettore 'handles'
+
+let bank_ref = Arc::clone(&bank); // nel .push sul vettore 'handles'
+
+let mut bank_ref = bank.lock().unwrap();   // nel main
+```
+
+E' importante capire perché uso sempre **_bank_ref_** senza rischiare alcun tipo di _"shadowing"_, questo succede perché ogni riferimento su bank_ref appartiene ad uno scope ben distinto e quinid non viene sovrascritto da Rust.
+
+---
+
+## RwLock o Mutex
+
+Per applicare un vero parallelismo esiste un terzo componente : **RwLock**
+
+- **RwLock** : è un alternativa a _Mutex_ fa la stessa cosa (condividere la manipolazione tra i thread) ma:
+  - permette più accessi contemporanei in lettura
+  - ed uno solo in scrittura
+
+La scelta tra Mutex e RwLock dipende dal tipo di accessi previsti ad un determinato dato:
+
+- se ad esempio si tratta di un conto bancario è sufficente un Mutex
+  - Il Mutex non distingue tra lettori e scrittori, considera tutti come "utilizzatori esclusivi"
+- se ho bisogno di condividere il dato in lettura tra più parti (come ad esempio un app di criptovalute) è consigliabile RwLock
+  - ci sono quindi tante chiavi per leggere ed 1 per scrivere
+
+```rs
+use std::sync::{Arc, Mutex, RwLock};
+use std::thread;
+
+let data_mutex = Arc::new(Mutex::new(0));
+let data_rwlock = Arc::new(RwLock::new(0));
+
+// Mutex: anche solo leggere blocca gli altri
+{
+    let _lock1 = data_mutex.lock().unwrap();
+    let _lock2 = data_mutex.lock().unwrap(); // ❌ blocca: lock esclusivo
+}
+
+// RwLock: più lettori insieme
+{
+    let _r1 = data_rwlock.read().unwrap();
+    let _r2 = data_rwlock.read().unwrap(); // ✅ funziona: letture parallele
+}
+```
+
+---
